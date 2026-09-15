@@ -1,55 +1,45 @@
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+import { email } from "hatchable";
 
-  try {
-    const { name, email, message } = req.body || {};
+export const access = "public";
+export const methods = ["POST"];
 
-    if (!name || !email || !message) {
-      return res.status(400).json({ error: "Please fill all fields." });
-    }
+export default async function (req, res) {
+  const name = String(req.body?.Name || "").trim();
+  const senderEmail = String(req.body?.Email || "").trim();
+  const message = String(req.body?.Message || "").trim();
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        from: "Portfolio Feedback <onboarding@resend.dev>",
-        to: ["mrinmoym407@gmail.com"],
-        reply_to: email,
-        subject: `Portfolio Feedback from ${name}`,
-        html: `
-          <h2>New Portfolio Feedback</h2>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Message:</strong></p>
-          <p>${message}</p>
-        `
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Resend error:", data);
-      return res.status(500).json({
-        error: "Unable to send feedback."
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Feedback sent successfully."
-    });
-
-  } catch (error) {
-    console.error("Feedback error:", error);
-
-    return res.status(500).json({
-      error: "Unable to send feedback."
+  if (!name || !senderEmail || !message) {
+    return res.status(400).json({
+      error: "Please fill all fields."
     });
   }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(senderEmail)) {
+    return res.status(400).json({
+      error: "Please enter a valid email address."
+    });
+  }
+
+  const safeName = name.replace(/[<>]/g, "");
+  const safeEmail = senderEmail.replace(/[<>]/g, "");
+  const safeMessage = message.replace(/[<>]/g, "");
+
+  await email.send({
+    to: "mrinmoym407@gmail.com",
+    subject: `Portfolio Feedback from ${safeName}`,
+    html: `
+      <h2>New Portfolio Feedback</h2>
+      <p><strong>Name:</strong> ${safeName}</p>
+      <p><strong>Email:</strong> ${safeEmail}</p>
+      <p><strong>Message:</strong></p>
+      <p>${safeMessage.replace(/\n/g, "<br>")}</p>
+    `
+  });
+
+  res.json({
+    success: true,
+    message: "Feedback sent successfully."
+  });
 }
